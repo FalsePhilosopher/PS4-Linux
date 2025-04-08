@@ -1,5 +1,8 @@
 # PS4-Linux
 
+PS4 Linux payloads on 11.00 where compiled from this [repo](https://github.com/kmeps4/PS4-Linux-Loader)  
+Ps4 Linux payloads on 9.00 where downloaded from [PS4linux.com](https://ps4linux.com/downloads/)
+
 Mesa was compiled for arch.  
 bzImage is [kernel 6.12.y](https://github.com/crashniels/linux) compiled with seccomp, zstd, zram, and btrfs support.
 
