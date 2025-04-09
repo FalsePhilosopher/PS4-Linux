@@ -45,6 +45,55 @@ else
         exit 1
     fi
 fi
+list() {
+echo "Listing external drives..."
+    lsblk -dpno NAME,MODEL,SIZE | grep -vE "boot|rpmb|loop"
+
+    read -rp "Enter the device to format (e.g. /dev/sdb): " drive
+
+    if [[ ! -b "$drive" ]]; then
+        echo "Invalid device: $drive"
+        exit 1
+    fi
+
+    read -rp "ALL DATA ON $drive WILL BE LOST. Continue? (y/n): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+}
+part_drive() {
+echo "Wiping and partitioning $drive..."
+    sudo parted -s "$drive" mklabel gpt
+    sudo parted -s "$drive" mkpart primary fat32 1MiB 51MiB
+    sudo parted -s "$drive" set 1 esp on
+
+    total_size=$(lsblk -bdno SIZE "$drive" | head -n1)
+    fat32_end=$((51 * 1024 * 1024))
+    swap_size=$((8 * 1024 * 1024 * 1024))
+    ext4_end=$((total_size - swap_size))
+
+    sudo parted -s "$drive" mkpart primary ext4 ${fat32_end}B ${ext4_end}B
+    sudo parted -s "$drive" mkpart primary linux-swap ${ext4_end}B 100%
+
+    sleep 1
+    sudo mkfs.vfat "${drive}1"
+    sudo mkfs.ext4 -L psxitarch "${drive}2"
+    sudo mkswap "${drive}3"
+
+    mountpoint="/mnt/psxitarch"
+    boot_mount="/mnt/ps4boot"
+    sudo mkdir -p "$mountpoint" "$boot_mount"
+    
+    echo "Mounting FAT32 partition..."
+    sudo mount "${drive}1" "$boot_mount"
+    echo "Copying bzImage and initramfs.cpio.gz to FAT32 partition"
+    sudo cp bzImage initramfs.cpio.gz "$boot_mount/"
+    sudo umount "$boot_mount"
+    
+    echo "Mounting EXT4 partition"
+    sudo mount "${drive}2" "$mountpoint"
+}
 ask() {
     read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
     if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
@@ -144,57 +193,13 @@ read -rp "Choose an option (1, 2, 3, 4): " choice
             exit 0
         fi
     else
-        echo "No EXT4 partition labeled 'psxitarch' found"
+        echo "No partition labeled psxitarch found"
         exit 1
     fi
     ;;
     3)
-    echo "Listing external drives..."
-    lsblk -dpno NAME,MODEL,SIZE | grep -vE "boot|rpmb|loop"
-
-    read -rp "Enter the device to format (e.g. /dev/sdb): " drive
-
-    if [[ ! -b "$drive" ]]; then
-        echo "Invalid device: $drive"
-        exit 1
-    fi
-
-    read -rp "ALL DATA ON $drive WILL BE LOST. Continue? (y/n): " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 0
-    fi
-
-    echo "Wiping and partitioning $drive..."
-    sudo parted -s "$drive" mklabel gpt
-    sudo parted -s "$drive" mkpart primary fat32 1MiB 51MiB
-    sudo parted -s "$drive" set 1 esp on
-
-    total_size=$(lsblk -bdno SIZE "$drive" | head -n1)
-    fat32_end=$((51 * 1024 * 1024))
-    swap_size=$((8 * 1024 * 1024 * 1024))
-    ext4_end=$((total_size - swap_size))
-
-    sudo parted -s "$drive" mkpart primary ext4 ${fat32_end}B ${ext4_end}B
-    sudo parted -s "$drive" mkpart primary linux-swap ${ext4_end}B 100%
-
-    sleep 1
-    sudo mkfs.vfat "${drive}1"
-    sudo mkfs.ext4 -L psxitarch "${drive}2"
-    sudo mkswap "${drive}3"
-
-    mountpoint="/mnt/psxitarch"
-    boot_mount="/mnt/ps4boot"
-    sudo mkdir -p "$mountpoint" "$boot_mount"
-    
-    echo "Mounting FAT32 partition..."
-    sudo mount "${drive}1" "$boot_mount"
-    echo "Copying bzImage and initramfs.cpio.gz to FAT32 partition..."
-    sudo cp bzImage initramfs.cpio.gz "$boot_mount/"
-    sudo umount "$boot_mount"
-    
-    echo "Mounting EXT4 partition..."
-    sudo mount "${drive}2" "$mountpoint"
+    list
+    part_drive
     ask
     echo "Copying PS4 Linux to EXT4 partition"
     extract_archive "$mountpoint"
@@ -206,85 +211,32 @@ read -rp "Choose an option (1, 2, 3, 4): " choice
     exit 0
     ;;
     4)
-    sudo mkdir ps4linux
-    cd ps4linux
     read -rp "Enter the repo owner/repo (i.e FalsePhilosopher/PS4-Linux): " repo
     echo "Fetching release tags from GitHub..."
     tags=$(curl -s "https://api.github.com/repos/$repo/releases" | jq -r '.[].tag_name')
-
     if [[ -z "$tags" ]]; then
         echo "No releases found or failed to fetch tags."
         exit 1
     fi
-
     mapfile -t tag_array <<< "$tags"
-
     echo "Available release tags:"
     for i in "${!tag_array[@]}"; do
         printf "%2d) %s\n" "$((i+1))" "${tag_array[i]}"
     done
-
     read -rp "Select a release number: " tag_choice
-
     if ! [[ "$tag_choice" =~ ^[0-9]+$ ]] || (( tag_choice < 1 || tag_choice > ${#tag_array[@]} )); then
         echo "Invalid selection."
         exit 1
     fi
-
     tag="${tag_array[$((tag_choice-1))]}"
     echo "Selected tag: $tag"
-
-gh release download "$tag" -R "$repo"
-if [ $? -ne 0 ]; then
+    
+    if ! gh release download "$tag" -R "$repo"; then
     echo "Failed to download the release."
     exit 1
-fi
-    echo "Listing external drives..."
-    lsblk -dpno NAME,MODEL,SIZE | grep -vE "boot|rpmb|loop"
-
-    read -rp "Enter the device to format (e.g. /dev/sdb): " drive
-
-    if [[ ! -b "$drive" ]]; then
-        echo "Invalid device: $drive"
-        exit 1
     fi
-
-    read -rp "ALL DATA ON $drive WILL BE LOST. Continue? (y/n): " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 0
-    fi
-
-    echo "Wiping and partitioning $drive..."
-    sudo parted -s "$drive" mklabel gpt
-    sudo parted -s "$drive" mkpart primary fat32 1MiB 51MiB
-    sudo parted -s "$drive" set 1 esp on
-
-    total_size=$(lsblk -bdno SIZE "$drive" | head -n1)
-    fat32_end=$((51 * 1024 * 1024))
-    swap_size=$((8 * 1024 * 1024 * 1024))
-    ext4_end=$((total_size - swap_size))
-
-    sudo parted -s "$drive" mkpart primary ext4 ${fat32_end}B ${ext4_end}B
-    sudo parted -s "$drive" mkpart primary linux-swap ${ext4_end}B 100%
-
-    sleep 1
-    sudo mkfs.vfat "${drive}1"
-    sudo mkfs.ext4 -L psxitarch "${drive}2"
-    sudo mkswap "${drive}3"
-
-    mountpoint="/mnt/psxitarch"
-    boot_mount="/mnt/ps4boot"
-    sudo mkdir -p "$mountpoint" "$boot_mount"
-    
-    echo "Mounting FAT32 partition..."
-    sudo mount "${drive}1" "$boot_mount"
-    echo "Copying bzImage and initramfs.cpio.gz to FAT32 partition"
-    sudo cp bzImage initramfs.cpio.gz "$boot_mount/"
-    sudo umount "$boot_mount"
-    
-    echo "Mounting EXT4 partition"
-    sudo mount "${drive}2" "$mountpoint"
+    list
+    part_drive
     ls
     echo "The files are listed above"
     ask
