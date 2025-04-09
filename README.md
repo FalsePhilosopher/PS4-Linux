@@ -18,3 +18,7 @@ wget https://github.com/FalsePhilosopher/PS4-Linux/raw/main/ps4linuxinstall.sh
 chmod +x ps4linuxinstall.sh
 ./ps4linuxinstall.sh
 ```
+This has 3 options  
+1 Scan for a mounted EXT4 partition named psxitarch and extract the OS to it
+2 Format an external drive for PS4 Linux and extract the OS to it
+3 Enter custom extraction path to extract the OS to.
