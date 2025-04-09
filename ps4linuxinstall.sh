@@ -42,7 +42,7 @@ extract_archive() {
             if $is_multipart; then
                 sudo 7z x ${archive_base}*.${archive_type}* -o"$target_path"
             else
-                sudo 7z x "${archive_base}.${archive_type}" -o"$target_path"
+                sudo 7z x "$archive_name" -o"$target_path"
             fi
             ;;
         *)
