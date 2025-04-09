@@ -14,5 +14,5 @@ You need to download bzImage, initramfs.cpio.gz, and all the ps4distro.tar.zst p
 2. cd to the folder with the files
 2. Copy and paste the code below to run the installer
 ```
-wget -qO - https://github.com/FalsePhilosopher/PS4-Linux/raw/main/ps4linuxwsl.sh | bash
+wget -qO - https://github.com/FalsePhilosopher/PS4-Linux/raw/main/ps4linuxinstall.sh | bash
 ```
