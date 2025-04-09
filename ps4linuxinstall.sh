@@ -1,12 +1,11 @@
 #!/bin/bash
-
-# Commands to check, with package names
+mountdir="/mnt/psxitarch"
+bootdir="/mnt/ps4boot"
 declare -A TOOLS=(
     [zstd]="zstd"
     [7z]="p7zip-full"
     [gh]="gh"
 )
-
 MISSING=()
 
 for cmd in "${!TOOLS[@]}"; do
@@ -39,12 +38,10 @@ elif command -v pacman &> /dev/null; then
     INSTALL="sudo pacman -S --noconfirm"
 else
     echo "No supported package manager found (apt, dnf, pacman)."
-    exit 1
+    exec $0
 fi
-
 echo "Using $PM to install packages..."
 eval "$UPDATE"
-
 for tool in "${MISSING[@]}"; do
     if [[ "$tool" == "gh" && "$PM" == "apt" ]]; then
         type -p curl >/dev/null || sudo apt install -y curl
@@ -67,10 +64,52 @@ for tool in "${MISSING[@]}"; do
     fi
 done
     else
-        echo "Installation skipped. Missing tools may cause issues."
-        exit 1
+        echo "Installation skipped. Missing tools will cause issues."
     fi
 fi
+
+gh_dl() {
+    read -rp "Enter the repo owner/repo (i.e FalsePhilosopher/PS4-Linux): " repo
+    echo "Fetching release tags from GitHub..."
+    tags=$(curl -s "https://api.github.com/repos/$repo/releases" | jq -r '.[].tag_name')
+    if [[ -z "$tags" ]]; then
+        echo "No releases found or failed to fetch tags."
+        exec $0
+    fi
+    mapfile -t tag_array <<< "$tags"
+    echo "Available release tags:"
+    for i in "${!tag_array[@]}"; do
+        printf "%2d) %s\n" "$((i+1))" "${tag_array[i]}"
+    done
+    read -rp "Select a release number: " tag_choice
+    if ! [[ "$tag_choice" =~ ^[0-9]+$ ]] || (( tag_choice < 1 || tag_choice > ${#tag_array[@]} )); then
+        echo "Invalid selection."
+        exec $0
+    fi
+    tag="${tag_array[$((tag_choice-1))]}"
+    echo "Selected tag: $tag"
+    
+    if ! gh release download "$tag" -R "$repo"; then
+    echo "Failed to download the release."
+    exec $0
+    fi
+}
+
+ask() {
+    read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
+    if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
+    is_multipart=true
+    else
+    is_multipart=false
+    fi
+read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
+read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
+    if [[ "$archive_type" == "7z" ]]; then
+    archive_name="${archive_base}.${archive_type}"
+    else
+    archive_name="${archive_base}.tar.${archive_type}"
+    fi
+}
 list() {
 echo "Listing external drives..."
     lsblk -dpno NAME,MODEL,SIZE | grep -vE "boot|rpmb|loop"
@@ -79,16 +118,17 @@ echo "Listing external drives..."
 
     if [[ ! -b "$drive" ]]; then
         echo "Invalid device: $drive"
-        exit 1
+        exec $0
     fi
 
     read -rp "ALL DATA ON $drive WILL BE LOST. Continue? (y/n): " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo "Aborted."
-        exit 0
+        exec $0
     fi
 }
-part_drive() {
+
+part() {
 echo "Wiping and partitioning $drive..."
     sudo parted -s "$drive" mklabel gpt
     sudo parted -s "$drive" mkpart primary fat32 1MiB 51MiB
@@ -106,43 +146,25 @@ echo "Wiping and partitioning $drive..."
     sudo mkfs.vfat "${drive}1"
     sudo mkfs.ext4 -L psxitarch "${drive}2"
     sudo mkswap "${drive}3"
-
-    mountpoint="/mnt/psxitarch"
-    boot_mount="/mnt/ps4boot"
-    sudo mkdir -p "$mountpoint" "$boot_mount"
+    sudo mkdir -p "$mountdir" "$bootdir"
     
     echo "Mounting FAT32 partition..."
-    sudo mount "${drive}1" "$boot_mount"
+    sudo mount "${drive}1" "$bootdir"
     echo "Copying bzImage and initramfs.cpio.gz to FAT32 partition"
-    sudo cp bzImage initramfs.cpio.gz "$boot_mount/"
-    sudo umount "$boot_mount"
+    sudo cp bzImage initramfs.cpio.gz "$bootdir/"
+    sudo umount "$bootdir"
     
     echo "Mounting EXT4 partition"
-    sudo mount "${drive}2" "$mountpoint"
-}
-ask() {
-    read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
-    if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
-    is_multipart=true
-    else
-    is_multipart=false
-    fi
-read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
-read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
-    if [[ "$archive_type" == "7z" ]]; then
-    archive_name="${archive_base}.${archive_type}"
-    else
-    archive_name="${archive_base}.tar.${archive_type}"
-    fi
+    sudo mount "${drive}2" "$mountdir"
 }
 
-extract_archive() {
+extract() {
     local target_path="$1"
     echo "Extracting archive to: $target_path"
 
     if [[ ! -d "$target_path" ]]; then
         echo "Error: '$target_path' is not a valid directory."
-        exit 1
+        exec $0
     fi
 
     case $archive_type in
@@ -175,23 +197,30 @@ extract_archive() {
             fi
             ;;
     esac
-    }
+}
 
+clean() {
+    sudo umount "$mountdir"
+    echo "Extraction complete."
+    sudo rm -rf "$mountdir" "$bootdir"
+    echo "All done."
+}
+    
 echo "[1] Enter custom extraction path"
 echo "[2] Scan for a partition labeled psxitarch and extract OS to it"
 echo "[3] Format an external drive for PS4 Linux and extract OS/bootloader to it"
-echo "[4] Download an OS from a gh release, format an external drive for PS4 Linux and extract OS/bootloader to it"
-read -rp "Choose an option (1, 2, 3, 4): " choice
+echo "[4] Download an OS from a gh release"
+echo "[5] Download an OS from a gh release, format an external drive for PS4 Linux and extract OS/bootloader to it"
+read -rp "Choose an option (1, 2, 3, 4, 5): " choice
     case "$choice" in
     1)
     ask
     read -rp "Enter full path to extract the archive(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
-    extract_archive "$manual_path"
+    extract "$manual_path"
     ;;
     2)
     echo "Scanning for partition with label psxitarch"
     device=$(lsblk -o NAME,LABEL,FSTYPE -nr | grep -E 'psxitarch' | awk '{print "/dev/" $1}' | head -n1)
-
     if [[ -n "$device" ]]; then
         mountpoint=$(lsblk -no MOUNTPOINT "$device")
         if [[ -z "$mountpoint" ]]; then
@@ -202,7 +231,7 @@ read -rp "Choose an option (1, 2, 3, 4): " choice
                 candidate="/mnt/psxitarch"
             else
                 echo "Failed to mount $device"
-                exit 1
+                exec $0
             fi
         else
             echo "Partition already mounted at: $mountpoint"
@@ -211,72 +240,42 @@ read -rp "Choose an option (1, 2, 3, 4): " choice
         read -rp "Extract archive to this path? (y/n): " confirm
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
             ask
-            extract_archive "$candidate"
-            sudo umount "$device"
-            sudo rm -rf /mnt/psxitarch
+            extract "$candidate"
+            clean
         else
             echo "Aborted."
-            exit 0
+            exec $0
         fi
     else
         echo "No partition labeled psxitarch found"
-        exit 1
+        exec $0
     fi
     ;;
     3)
     list
-    part_drive
+    part
     ask
     echo "Copying PS4 Linux to EXT4 partition"
-    extract_archive "$mountpoint"
-    sudo umount "$mountpoint"
-    echo "Extraction complete."
-    sudo rm -rf "$mountpoint" "$boot_mount"
-    echo "All done."
-
-    exit 0
+    extract "$mountdir"
+    clean
     ;;
     4)
-    read -rp "Enter the repo owner/repo (i.e FalsePhilosopher/PS4-Linux): " repo
-    echo "Fetching release tags from GitHub..."
-    tags=$(curl -s "https://api.github.com/repos/$repo/releases" | jq -r '.[].tag_name')
-    if [[ -z "$tags" ]]; then
-        echo "No releases found or failed to fetch tags."
-        exit 1
-    fi
-    mapfile -t tag_array <<< "$tags"
-    echo "Available release tags:"
-    for i in "${!tag_array[@]}"; do
-        printf "%2d) %s\n" "$((i+1))" "${tag_array[i]}"
-    done
-    read -rp "Select a release number: " tag_choice
-    if ! [[ "$tag_choice" =~ ^[0-9]+$ ]] || (( tag_choice < 1 || tag_choice > ${#tag_array[@]} )); then
-        echo "Invalid selection."
-        exit 1
-    fi
-    tag="${tag_array[$((tag_choice-1))]}"
-    echo "Selected tag: $tag"
-    
-    if ! gh release download "$tag" -R "$repo"; then
-    echo "Failed to download the release."
-    exit 1
-    fi
+    gh_dl
+    echo "All done."
+    ;;
+    5)
+    gh_dl
     list
-    part_drive
+    part
     ls
     echo "The files are listed above"
     ask
     echo "Copying PS4 Linux to EXT4 partition"
-    extract_archive "$mountpoint"
-    sudo umount "$mountpoint"
-    echo "Extraction complete."
-    sudo rm -rf "$mountpoint" "$boot_mount"
-    echo "All done."
-
-    exit 0
+    extract "$mountdir"
+    clean
     ;;
     *)
     echo "Invalid choice."
-    exit 1
+    exec $0
     ;;
     esac
