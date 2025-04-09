@@ -21,7 +21,6 @@ else
     for tool in "${MISSING[@]}"; do
         echo "  - $tool"
     done
-
     read -rp "Would you like to install them now? [y/N]: " response
     if [[ "$response" =~ ^[Yy]$ ]]; then
         if command -v apt &> /dev/null; then
@@ -69,30 +68,49 @@ done
 fi
 
 gh_dl() {
-    read -rp "Enter the repo owner/repo (i.e FalsePhilosopher/PS4-Linux): " repo
-    echo "Fetching release tags from GitHub..."
-    tags=$(curl -s "https://api.github.com/repos/$repo/releases" | jq -r '.[].tag_name')
-    if [[ -z "$tags" ]]; then
-        echo "No releases found or failed to fetch tags."
-        exec $0
-    fi
-    mapfile -t tag_array <<< "$tags"
-    echo "Available release tags:"
-    for i in "${!tag_array[@]}"; do
-        printf "%2d) %s\n" "$((i+1))" "${tag_array[i]}"
-    done
-    read -rp "Select a release number: " tag_choice
-    if ! [[ "$tag_choice" =~ ^[0-9]+$ ]] || (( tag_choice < 1 || tag_choice > ${#tag_array[@]} )); then
-        echo "Invalid selection."
-        exec $0
-    fi
-    tag="${tag_array[$((tag_choice-1))]}"
-    echo "Selected tag: $tag"
-    
-    if ! gh release download "$tag" -R "$repo"; then
+echo "Select a GitHub repo to pull from:"
+echo " 1) Enter a custom repo"
+echo " 2) FalsePhilosopher/PS4-Linux"
+echo " 3) Nazky/PS4Gentoo"
+echo " 4) notzecoxao/ps4-kexec-dumper"
+echo " 5) sleirsgoevy/ps4-linux-vram"
+echo " 6) Darthsternie/PS4Linux-Loader"
+read -rp "Choose an option: " choice
+
+case "$choice" in
+    1) read -rp "Enter the repo owner/repo (i.e FalsePhilosopher/PS4-Linux): " repo ;;
+    2) repo="FalsePhilosopher/PS4-Linux" ;;
+    3) repo="Nazky/PS4Gentoo" ;;
+    4) repo="notzecoxao/ps4-kexec-dumper" ;;
+    5) repo="sleirsgoevy/ps4-linux-vram" ;;
+    6) repo="Darthsternie/PS4Linux-Loader" ;;
+esac
+
+echo "Fetching release tags from GitHub..."
+tags=$(curl -s "https://api.github.com/repos/$repo/releases" | jq -r '.[].tag_name')
+if [[ -z "$tags" ]]; then
+    echo "No releases found or failed to fetch tags."
+    exec "$0"
+fi
+
+mapfile -t tag_array <<< "$tags"
+echo "Available release tags:"
+for i in "${!tag_array[@]}"; do
+    printf "%2d) %s\n" "$((i+1))" "${tag_array[i]}"
+done
+
+read -rp "Select a release number: " tag_choice
+if ! [[ "$tag_choice" =~ ^[0-9]+$ ]] || (( tag_choice < 1 || tag_choice > ${#tag_array[@]} )); then
+    echo "Invalid selection."
+    exec "$0"
+fi
+tag="${tag_array[$((tag_choice-1))]}"
+echo "Selected tag: $tag"
+
+if ! gh release download "$tag" -R "$repo"; then
     echo "Failed to download the release."
-    exec $0
-    fi
+    exec "$0"
+fi
 }
 
 ask() {
@@ -201,21 +219,22 @@ extract() {
 
 clean() {
     sudo umount "$mountdir"
+    sudo umount "$bootdir"
     echo "Extraction complete."
     sudo rm -rf "$mountdir" "$bootdir"
     echo "All done."
 }
     
-echo "[1] Enter custom extraction path"
+echo "[1] Enter an extraction path"
 echo "[2] Scan for a partition labeled psxitarch and extract OS to it"
 echo "[3] Format an external drive for PS4 Linux and extract OS/bootloader to it"
-echo "[4] Download an OS from a gh release"
-echo "[5] Download an OS from a gh release, format an external drive for PS4 Linux and extract OS/bootloader to it"
+echo "[4] Download an OS from a github release"
+echo "[5] Download an OS from a github release, format an external drive for PS4 Linux and extract OS/bootloader to it"
 read -rp "Choose an option (1, 2, 3, 4, 5): " choice
     case "$choice" in
     1)
     ask
-    read -rp "Enter full path to extract the archive(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
+    read -rp "Enter full path to extract the OS to(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
     extract "$manual_path"
     ;;
     2)
