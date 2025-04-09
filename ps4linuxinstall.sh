@@ -7,7 +7,12 @@ else
 fi
 read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
 read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
-archive_name=${archive_base}.tar.${archive_type}
+if [[ "$archive_type" == "7z" ]]; then
+    archive_name="${archive_base}.${archive_type}"
+else
+    archive_name="${archive_base}.tar.${archive_type}"
+fi
+
 
 extract_archive() {
     local target_path="$1"
