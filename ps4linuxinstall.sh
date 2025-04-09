@@ -25,21 +25,47 @@ else
 
     read -rp "Would you like to install them now? [y/N]: " response
     if [[ "$response" =~ ^[Yy]$ ]]; then
+        if command -v apt &> /dev/null; then
+    PM="apt"
+    UPDATE="sudo apt update"
+    INSTALL="sudo apt install -y"
+elif command -v dnf &> /dev/null; then
+    PM="dnf"
+    UPDATE="sudo dnf check-update"
+    INSTALL="sudo dnf install -y"
+elif command -v pacman &> /dev/null; then
+    PM="pacman"
+    UPDATE="sudo pacman -Sy"
+    INSTALL="sudo pacman -S --noconfirm"
+else
+    echo "No supported package manager found (apt, dnf, pacman)."
+    exit 1
+fi
+
+echo "Using $PM to install packages..."
+eval "$UPDATE"
+
+for tool in "${MISSING[@]}"; do
+    if [[ "$tool" == "gh" && "$PM" == "apt" ]]; then
+        type -p curl >/dev/null || sudo apt install -y curl
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+            sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+            sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
         sudo apt update
-        for tool in "${MISSING[@]}"; do
-            if [[ "$tool" == "gh" ]]; then
-                type -p curl >/dev/null || sudo apt install -y curl
-                curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
-                    sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-                sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-                echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
-                    sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-                sudo apt update
-                sudo apt install -y gh
-            else
-                sudo apt install -y "${TOOLS[$tool]}"
-            fi
-        done
+        sudo apt install -y gh
+    else
+        # Adjust tool names for pacman or dnf if needed
+        pkg="${TOOLS[$tool]}"
+        if [[ "$PM" == "pacman" ]]; then
+            [[ "$tool" == "7z" ]] && pkg="p7zip"
+        elif [[ "$PM" == "dnf" ]]; then
+            [[ "$tool" == "7z" ]] && pkg="p7zip"
+        fi
+        eval "$INSTALL $pkg"
+    fi
+done
     else
         echo "Installation skipped. Missing tools may cause issues."
         exit 1
