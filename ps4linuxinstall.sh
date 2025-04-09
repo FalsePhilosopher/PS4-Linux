@@ -104,16 +104,16 @@ extract_archive() {
 
 echo "[1] Enter custom extraction path"
 echo "[2] Scan for a partition labeled psxitarch and extract OS to it"
-echo "[3] Format an external drive for PS4 Linux and extract"
-echo "[4] Download an OS from a gh release, format an external drive for PS4 Linux and extract OS to it"
+echo "[3] Format an external drive for PS4 Linux and extract OS/bootloader to it"
+echo "[4] Download an OS from a gh release, format an external drive for PS4 Linux and extract OS/bootloader to it"
 read -rp "Choose an option (1, 2, 3, 4): " choice
-
-if [[ "$choice" == "1" ]]; then
+    case "$choice" in
+    1)
     ask
     read -rp "Enter full path to extract the archive(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
     extract_archive "$manual_path"
-    
-elif [[ "$choice" == "2" ]]; then
+    ;;
+    2)
     echo "Scanning for partition with label psxitarch"
     device=$(lsblk -o NAME,LABEL,FSTYPE -nr | grep -E 'psxitarch' | awk '{print "/dev/" $1}' | head -n1)
 
@@ -147,8 +147,8 @@ elif [[ "$choice" == "2" ]]; then
         echo "No EXT4 partition labeled 'psxitarch' found"
         exit 1
     fi
-
-elif [[ "$choice" == "3" ]]; then
+    ;;
+    3)
     echo "Listing external drives..."
     lsblk -dpno NAME,MODEL,SIZE | grep -vE "boot|rpmb|loop"
 
@@ -204,8 +204,8 @@ elif [[ "$choice" == "3" ]]; then
     echo "All done."
 
     exit 0
-    
-elif [[ "$choice" == "4" ]]; then
+    ;;
+    4)
     sudo mkdir ps4linux
     cd ps4linux
     read -rp "Enter the repo owner/repo (i.e FalsePhilosopher/PS4-Linux): " repo
@@ -233,8 +233,6 @@ elif [[ "$choice" == "4" ]]; then
 
     tag="${tag_array[$((tag_choice-1))]}"
     echo "Selected tag: $tag"
-
-set -x  # Enable script debugging
 
 gh release download "$tag" -R "$repo"
 if [ $? -ne 0 ]; then
@@ -298,7 +296,9 @@ fi
     echo "All done."
 
     exit 0
-else
+    ;;
+    *)
     echo "Invalid choice."
     exit 1
-fi
+    ;;
+    esac
