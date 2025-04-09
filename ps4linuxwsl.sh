@@ -1,12 +1,11 @@
 #!/bin/bash
-cd $PWD
 read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
 if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
     is_multipart=true
 else
     is_multipart=false
 fi
-read -rp "Enter the archive base name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
+read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
 read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
 archive_name=${archive_base}.tar.${archive_type}
 szarchive_name=${archive_base}.${archive_type}
