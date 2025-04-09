@@ -45,6 +45,21 @@ else
         exit 1
     fi
 fi
+ask() {
+    read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
+    if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
+    is_multipart=true
+    else
+    is_multipart=false
+    fi
+read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
+read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
+    if [[ "$archive_type" == "7z" ]]; then
+    archive_name="${archive_base}.${archive_type}"
+    else
+    archive_name="${archive_base}.tar.${archive_type}"
+    fi
+}
 
 extract_archive() {
     local target_path="$1"
@@ -94,19 +109,7 @@ echo "[4] Download an OS from a gh release, format an external drive for PS4 Lin
 read -rp "Choose an option (1, 2, 3, 4): " choice
 
 if [[ "$choice" == "1" ]]; then
-    read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
-    if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
-    is_multipart=true
-    else
-    is_multipart=false
-    fi
-read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
-read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
-    if [[ "$archive_type" == "7z" ]]; then
-    archive_name="${archive_base}.${archive_type}"
-    else
-    archive_name="${archive_base}.tar.${archive_type}"
-    fi
+    ask
     read -rp "Enter full path to extract the archive(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
     extract_archive "$manual_path"
     
@@ -130,21 +133,9 @@ elif [[ "$choice" == "2" ]]; then
             echo "Partition already mounted at: $mountpoint"
             candidate="$mountpoint"
         fi
-    read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
-    if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
-    is_multipart=true
-    else
-    is_multipart=false
-    fi
-    read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
-    read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
-    if [[ "$archive_type" == "7z" ]]; then
-    archive_name="${archive_base}.${archive_type}"
-    else
-    archive_name="${archive_base}.tar.${archive_type}"
-    fi
         read -rp "Extract archive to this path? (y/n): " confirm
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            ask
             extract_archive "$candidate"
             sudo umount "$device"
             sudo rm -rf /mnt/psxitarch
@@ -204,19 +195,7 @@ elif [[ "$choice" == "3" ]]; then
     
     echo "Mounting EXT4 partition..."
     sudo mount "${drive}2" "$mountpoint"
-    read -rp "Is this a multi-part archive? (y/n): " is_multipart_input
-    if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
-    is_multipart=true
-    else
-    is_multipart=false
-    fi
-    read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
-    read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
-    if [[ "$archive_type" == "7z" ]]; then
-    archive_name="${archive_base}.${archive_type}"
-    else
-    archive_name="${archive_base}.tar.${archive_type}"
-    fi
+    ask
     echo "Copying PS4 Linux to EXT4 partition"
     extract_archive "$mountpoint"
     sudo umount "$mountpoint"
@@ -310,19 +289,7 @@ fi
     sudo mount "${drive}2" "$mountpoint"
     ls
     echo "The files are listed above"
-    read -rp "Is it a multi-part archive? (y/n): " is_multipart_input
-    if [[ "$is_multipart_input" == "y" || "$is_multipart_input" == "Y" ]]; then
-    is_multipart=true
-    else
-    is_multipart=false
-    fi
-    read -rp "Enter the archive name without extension or multi part numbers(ie .tar.zst,.7z, or 01.tar.zst, 01.7z ): " archive_base
-    read -rp "Enter the archive extension(ie zst/xz/7z/gz): " archive_type
-    if [[ "$archive_type" == "7z" ]]; then
-    archive_name="${archive_base}.${archive_type}"
-    else
-    archive_name="${archive_base}.tar.${archive_type}"
-    fi
+    ask
     echo "Copying PS4 Linux to EXT4 partition"
     extract_archive "$mountpoint"
     sudo umount "$mountpoint"
