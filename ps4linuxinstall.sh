@@ -59,10 +59,14 @@ extract_archive() {
 echo "[1] Scan for EXT4 partition named 'psxitarch'"
 echo "[2] Format an external drive for PS4 Linux and extract"
 echo "[3] Enter custom extraction path"
-read -rp "Choose an option (1, 2, or 3): " choice
+read -rp "Choose an option (1, 2, 3): " choice
 
 if [[ "$choice" == "1" ]]; then
-    echo "Scanning for external EXT4 partitions with label 'psxitarch'..."
+    read -rp "Enter full path to extract the archive(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
+    extract_archive "$manual_path"
+    
+elif [[ "$choice" == "2" ]]; then
+echo "Scanning for external EXT4 partitions with label 'psxitarch'..."
     candidate=$(lsblk -o NAME,LABEL,FSTYPE,MOUNTPOINT | grep -E 'psxitarch.*ext4' | awk '{print $4}' | head -n1)
     if [[ -n "$candidate" ]]; then
         echo "Found candidate mount point: $candidate"
@@ -78,7 +82,7 @@ if [[ "$choice" == "1" ]]; then
         exit 1
     fi
 
-elif [[ "$choice" == "2" ]]; then
+elif [[ "$choice" == "3" ]]; then
     echo "Listing external drives..."
     lsblk -dpno NAME,MODEL,SIZE | grep -vE "boot|rpmb|loop"
 
@@ -133,11 +137,6 @@ elif [[ "$choice" == "2" ]]; then
     echo "All done."
 
     exit 0
-
-elif [[ "$choice" == "3" ]]; then
-    read -rp "Enter full path to extract the archive(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
-    extract_archive "$manual_path"
-
 else
     echo "Invalid choice."
     exit 1
