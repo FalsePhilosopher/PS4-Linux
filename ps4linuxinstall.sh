@@ -68,8 +68,27 @@ done
         echo "Installation skipped. Missing tools will cause issues."
     fi
 fi
-
+# Mega download function grabbed from https://gist.github.com/zanculmarktum/170b94764bd9a3da31078580ccea8d7e
 # Function to handle MEGA download and metadata extraction
+# Copyright 2018, 2019, 2020 Azure Zanculmarktum
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 mdl() {
 	local URL="$1"
 
@@ -122,10 +141,10 @@ mdl() {
 }
 
 mfdl() {
-    echo "The links might change and vist the link in the echo for a direct download"
-    echo "1) PopOS 22.04 by Noob404 https://ps4linux.com/pop-os-22-04-ps4-release"
-    echo "2) Fedora 38 by DF_AUS https://ps4linux.com/forums/d/117-fedora-38-by-df-aus"
-    read -p "Choice: " choice
+echo "The links might change and vist the link in the echo for a direct download"
+echo "1) PopOS 22.04 by Noob404 https://ps4linux.com/pop-os-22-04-ps4-release"
+echo "2) Fedora 38 by DF_AUS https://ps4linux.com/forums/d/117-fedora-38-by-df-aus"
+read -p "Choice: " choice
     case "$choice" in
     1)
         if ! wget "https://download2326.mediafire.com/r4fzjjbrnvsgbXtQ4ExtI-Amd3e2s4557WKENBcw0ZUn5ohniLtR7zVnUoMjY7FU7tTJqdjaAB1Gm4a79XomNpFnVyDHHHh-w39xvncuIIrDt_INKADNRZlJLkU-_RFdC8qrSuFsDP33Hkx0TzZ6AUciK3j1PrlMmDhy-5nIpin-/8kq3t69aoayh7ps/popos_22_04_ps4linux.tar.xz"; then
@@ -202,7 +221,7 @@ read -rp "Choice: " choice
             ;;
         q|Q) exec "$0"; ;;
         *) echo "Invalid option. Try again."; exec "$0" ;;
-		esac
+    esac
 }
 
 ghdl() {
