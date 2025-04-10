@@ -71,19 +71,19 @@ gh_dl() {
 echo "Select a GitHub repo to pull from:"
 echo " 1) Enter a custom repo"
 echo " 2) FalsePhilosopher/PS4-Linux"
-echo " 3) Nazky/PS4Gentoo"
-echo " 4) notzecoxao/ps4-kexec-dumper"
-echo " 5) sleirsgoevy/ps4-linux-vram"
-echo " 6) Darthsternie/PS4Linux-Loader"
+echo " 3) Example/Example"
+echo " 4) Example/Example"
+echo " 5) Example/Example"
+echo " 6) Example/Example"
 read -rp "Choose an option: " choice
 
 case "$choice" in
     1) read -rp "Enter the repo owner/repo (i.e FalsePhilosopher/PS4-Linux): " repo ;;
     2) repo="FalsePhilosopher/PS4-Linux" ;;
-    3) repo="Nazky/PS4Gentoo" ;;
-    4) repo="notzecoxao/ps4-kexec-dumper" ;;
-    5) repo="sleirsgoevy/ps4-linux-vram" ;;
-    6) repo="Darthsternie/PS4Linux-Loader" ;;
+    3) repo="Example/Example" ;;
+    4) repo="Example/Example" ;;
+    5) repo="Example/Example" ;;
+    6) repo="Example/Example" ;;
 esac
 
 echo "Fetching release tags from GitHub..."

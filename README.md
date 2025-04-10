@@ -25,3 +25,5 @@ wget https://github.com/FalsePhilosopher/PS4-Linux/raw/main/ps4linuxinstall.sh
 chmod +x ps4linuxinstall.sh
 ./ps4linuxinstall.sh
 ```
+
+Feel free to submit a PR adding your distro repo to the installer.
