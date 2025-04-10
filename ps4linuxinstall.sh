@@ -5,6 +5,8 @@ declare -A TOOLS=(
     [zstd]="zstd"
     [7z]="p7zip-full"
     [gh]="gh"
+    [curl]="curl"
+    [openssl]="openssl"
 )
 MISSING=()
 
@@ -67,7 +69,143 @@ done
     fi
 fi
 
-gh_dl() {
+# Function to handle MEGA download and metadata extraction
+mdl() {
+	local URL="$1"
+
+	if [[ ! $URL =~ ^https?://mega(\.co)?\.nz ]]; then
+		echo "Invalid MEGA URL." >&2
+		return 1
+	fi
+
+	CURL="curl -Y 1 -y 10"
+
+	for cmd in openssl; do
+		if ! command -v "$cmd" &>/dev/null; then
+			echo "Missing required command: $cmd" >&2
+			return 1
+		fi
+	done
+
+	if [[ $URL =~ .*/file/[^#]*#[^#]* ]]; then
+		id="${URL#*file/}"; id="${id%%#*}"
+		key="${URL##*file/}"; key="${key##*#}"
+	else
+		id="${URL#*!}"; id="${id%%!*}"
+		key="${URL##*!}"
+	fi
+
+	raw_hex=$(echo "${key}=" | tr '\-_' '+/' | tr -d ',' | base64 -d -i 2>/dev/null | od -v -An -t x1 | tr -d '\n ')
+	hex=$(printf "%016x" \
+		$(( 0x${raw_hex:0:16} ^ 0x${raw_hex:32:16} )) \
+		$(( 0x${raw_hex:16:16} ^ 0x${raw_hex:48:16} ))
+	)
+
+	json=$($CURL -s -H 'Content-Type: application/json' -d '[{"a":"g", "g":"1", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || return 1
+	json="${json#"[{"}"; json="${json%"}]"}"
+	file_url="${json##*'"g":'}"; file_url="${file_url%%,*}"; file_url="${file_url//'"'/}"
+
+	json=$($CURL -s -H 'Content-Type: application/json' -d '[{"a":"g", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || return 1
+	at="${json##*'"at":'}"; at="${at%%,*}"; at="${at//'"'/}"
+
+	json=$(echo "${at}==" | tr '\-_' '+/' | tr -d ',' | openssl enc -a -A -d -aes-128-cbc -K "$hex" -iv "00000000000000000000000000000000" -nopad | tr -d '\0')
+	json="${json#"MEGA{"}"; json="${json%"}"}"
+	file_name="${json##*'"n":'}"
+	[[ $file_name == *,* ]] && file_name="${file_name%%,*}"
+	file_name="${file_name//'"'/}"
+
+	echo "Download URL: $file_url"
+	echo "Filename: $file_name"
+	echo "Decryption Key (K): $hex"
+	echo "IV: ${raw_hex:32:16}0000000000000000"
+	curl -s "$file_url" | openssl enc -d -aes-128-ctr -K "$hex" -iv "${raw_hex:32:16}0000000000000000" > "$file_name"
+}
+
+mfdl() {
+    echo "The links might change and vist the link in the echo for a direct download"
+    echo "1) PopOS 22.04 by Noob404 https://ps4linux.com/pop-os-22-04-ps4-release"
+    echo "2) Fedora 38 by DF_AUS https://ps4linux.com/forums/d/117-fedora-38-by-df-aus"
+    read -p "Choice: " choice
+    case "$choice" in
+    1)
+        if ! wget "https://download2326.mediafire.com/r4fzjjbrnvsgbXtQ4ExtI-Amd3e2s4557WKENBcw0ZUn5ohniLtR7zVnUoMjY7FU7tTJqdjaAB1Gm4a79XomNpFnVyDHHHh-w39xvncuIIrDt_INKADNRZlJLkU-_RFdC8qrSuFsDP33Hkx0TzZ6AUciK3j1PrlMmDhy-5nIpin-/8kq3t69aoayh7ps/popos_22_04_ps4linux.tar.xz"; then
+        echo "Failed to download the release."
+        exec "$0"
+        fi
+        ;;
+    2)
+        if ! wget "https://download2391.mediafire.com/665wzuzhr9xgj8aHTYGHDecUIXGC0sze6nLBf7szAHhkNQUjmLlpEa4Ob22_xdnN5IYci6lt96b_9z4H30O8kQGTWIt0akYIML5w71Wir834FZR68ChPyvw8rcF7lroohcCv62b8cb0NHdkajYKvI-q_q-cIkQESrsQ9Uijno7ya/h2evdbzgk1zm7y4/psxitarch.tar.xz"; then
+        echo "Failed to download the release."
+        exec "$0"
+        fi
+        ;;
+    q|Q) exec "$0"; ;;
+    *) echo "Invalid option. Try again."; exec "$0" ;;
+    esac
+}
+
+dmdl() {
+echo "1) Psxitarch v3 by PS3ITA https://ps4linux.com/psxitarch-v3-ps4-distro-release/"
+echo "2) ArchLinux PS4 v2 by whitehax0r https://github.com/whitehax0r/ArchLinux-PS4v2"
+echo "3) SteamOS 3.0 by Nazky https://ps4linux.com/steamos-3-ps4-nazky/"
+echo "4) Fedora 38 by DF_AUS https://ps4linux.com/forums/d/117-fedora-38-by-df-aus"
+echo "6) Retrowave by Elive https://ps4linux.com/retrowave-linux-ps4-emulationstation/"
+echo "7) Batocera by Noob404 User:root Pass:linux"
+echo "q) Quit"
+read -rp "Choice: " choice
+    case "$choice" in
+        1)
+            if ! mdl "https://mega.nz/file/lIBCWCxa#Lq9oWyleu7W6Zcg_qeuKA0JQNOz1SzS-WTOQAGHQ7iY"; then
+            echo "Failed to download the release."
+            exec "$0"
+            fi
+            ;;
+        2)
+            if ! mdl "https://mega.nz/file/vn5glJbB#ZWSZA7scPuyx1UkOiM_UW7NoUxxMc_L3pJGiUWKbmRI"; then
+            echo "Failed to download the release."
+            exec "$0"
+            fi
+            ;;
+        3)
+            if ! mdl "https://mega.nz/file/dtQGET5Z#2Q-gWKt0Yjgtn8FCkRTlqs23YFjW2koGFshvfO65uUU"; then
+            echo "Failed to download the release."
+            exec "$0"
+            fi
+            ;;
+        4)
+            if ! mdl "https://mega.nz/file/PMNVEbhQ#jd9SB0MyscQlPMPf-DKb8TyulW0ahE3nsJjuWY9TUrc"; then
+            echo "Failed to download the release."
+            exec "$0"
+            fi
+            ;;
+        5)
+            if ! mdl "https://mega.nz/folder/S002hSJC#Qt4biffDx3tn3hmGX1nilw/file/34kxhLwQ"; then
+            echo "Failed to download part 1 of the release"
+            exec "$0"
+            fi
+            if ! mdl "https://mega.nz/folder/S002hSJC#Qt4biffDx3tn3hmGX1nilw/file/LtslUJbZ"; then
+            echo "Failed to download part 2 of the release"
+            exec "$0"
+            fi
+            ;;
+        6)
+            if ! mdl "https://mega.nz/file/PMNVEbhQ#jd9SB0MyscQlPMPf-DKb8TyulW0ahE3nsJjuWY9TUrc"; then
+            echo "Failed to download the release."
+            exec "$0"
+            fi
+            ;;
+        7)
+            if ! mdl "https://mega.nz/file/5jl1QIoA#K2wYgFMurOwTRZ6AZFbk7Ewt8tzXil92X8HyWq_RgI8"; then
+            echo "Failed to download the release."
+            exec "$0"
+            fi
+            ;;
+        q|Q) exec "$0"; ;;
+        *) echo "Invalid option. Try again."; exec "$0" ;;
+		esac
+}
+
+ghdl() {
 echo "Select a GitHub repo to pull from:"
 echo " 1) Enter a custom repo"
 echo " 2) FalsePhilosopher/PS4-Linux"
@@ -75,6 +213,7 @@ echo " 3) Example/Example"
 echo " 4) Example/Example"
 echo " 5) Example/Example"
 echo " 6) Example/Example"
+echo " Q) Quit"
 read -rp "Choose an option: " choice
 
 case "$choice" in
@@ -84,6 +223,8 @@ case "$choice" in
     4) repo="Example/Example" ;;
     5) repo="Example/Example" ;;
     6) repo="Example/Example" ;;
+    q|Q) exec "$0";;
+    *) echo "Invalid option. Try again."; exec "$0" ;;
 esac
 
 echo "Fetching release tags from GitHub..."
@@ -229,13 +370,16 @@ echo "[1] Enter an extraction path"
 echo "[2] Scan for a partition labeled psxitarch and extract OS to it"
 echo "[3] Format an external drive for PS4 Linux and extract OS/bootloader to it"
 echo "[4] Download an OS from a github release"
-echo "[5] Download an OS from a github release, format an external drive for PS4 Linux and extract OS/bootloader to it"
-read -rp "Choose an option (1, 2, 3, 4, 5): " choice
+echo "[5] Download an OS from mega.nz"
+echo "[6] Download an OS from mediafire"
+echo "[Q] Quit"
+read -rp "Choose an option (1, 2, 3, 4, 5, 6): " choice
     case "$choice" in
     1)
     ask
     read -rp "Enter full path to extract the OS to(It's usually /media/$USER/psxitarch or /mnt/psxitarch): " manual_path
     extract "$manual_path"
+    echo "All done."
     ;;
     2)
     echo "Scanning for partition with label psxitarch"
@@ -269,6 +413,7 @@ read -rp "Choose an option (1, 2, 3, 4, 5): " choice
         echo "No partition labeled psxitarch found"
         exec $0
     fi
+    echo "All done."
     ;;
     3)
     list
@@ -277,24 +422,11 @@ read -rp "Choose an option (1, 2, 3, 4, 5): " choice
     echo "Copying PS4 Linux to EXT4 partition"
     extract "$mountdir"
     clean
-    ;;
-    4)
-    gh_dl
     echo "All done."
     ;;
-    5)
-    gh_dl
-    list
-    part
-    ls
-    echo "The files are listed above"
-    ask
-    echo "Copying PS4 Linux to EXT4 partition"
-    extract "$mountdir"
-    clean
-    ;;
-    *)
-    echo "Invalid choice."
-    exec $0
-    ;;
+    4) ghdl; echo "All done."; exec "$0" ;;
+    5) dmdl; echo "All done."; exec "$0" ;;
+    6) mfdl; echo "All done."; exec "$0" ;;
+    q|Q) exit 0 ;;
+    *) echo "Invalid choice."; exec $0 ;;
     esac

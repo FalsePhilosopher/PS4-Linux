@@ -15,7 +15,9 @@ This has 5 options
 2 Scan for a partition labeled psxitarch and extract the OS to it.  
 3 Format an external drive for PS4 Linux and extract the OS/bootloader to it.  
 4 Download an OS from a github release  
-5 Download an OS from a github release, format an external drive for PS4 Linux and extract OS/bootloader to it.  
+5 Download an OS from mega.nz  
+6 Download an OS from mediafire  
+
 
 To start you need to have bzImage, initramfs.cpio.gz, and the ps4 distro to the same folder then.  
 1. Open a terminal
