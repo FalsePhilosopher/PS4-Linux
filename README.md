@@ -1,5 +1,6 @@
 # PS4-Linux
 
+You can find everything you need to know about PS4 linux in the [PS4Linux-Documentation](https://github.com/Hakkuraifu/PS4Linux-Documentation)
 PS4 Linux payloads on 11.00 where compiled from this [repo](https://github.com/kmeps4/PS4-Linux-Loader)  
 PS4 Linux payloads on 9.00 where downloaded from [PS4linux.com](https://ps4linux.com/downloads/)
 The initramfs is from [Hippie68](https://github.com/hippie68/psxitarch-how-to/releases/tag/v1.00)
